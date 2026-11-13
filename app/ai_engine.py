@@ -3,12 +3,21 @@ import logging
 from typing import List, Dict, Any, Optional
 import httpx
 from app.config import settings
+from fastembed import TextEmbedding
 
 logger = logging.getLogger(__name__)
 
 # Global Pinecone index instance cache
 _pinecone_index = None
+_embedding_model = None
 
+def get_embedding_model():
+    global _embedding_model
+    if _embedding_model is None:
+        # Downloads the ~80MB model on first run, then runs locally forever
+        logger.info("Loading local embedding model (this happens only once)...")
+        _embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+    return _embedding_model
 
 def init_pinecone():
     """
@@ -47,7 +56,23 @@ def init_pinecone():
         logger.warning(f"Failed to initialize Pinecone: {e}. Falling back to in-memory/mock mode.")
         return None
 
-
+async def get_embedding(text: str) -> List[float]:
+    """
+    Generates 384-dim embeddings locally using FastEmbed. 
+    No API keys, no network requests, no DNS errors.
+    """
+    if not text.strip():
+        return [0.0] * 384
+    
+    try:
+        model = get_embedding_model()
+        # fastembed returns an iterator of numpy arrays
+        embeddings = list(model.embed(text))
+        return embeddings[0].tolist()
+    except Exception as e:
+        logger.warning(f"Local embedding failed: {e}")
+        return [0.0] * 384
+'''
 async def get_embedding(text: str) -> List[float]:
     """
     POST to HuggingFace Inference API (sentence-transformers/all-MiniLM-L6-v2).
@@ -88,7 +113,7 @@ async def get_embedding(text: str) -> List[float]:
             await asyncio.sleep(1.0)
 
     return [0.0] * 384
-
+'''
 
 async def index_book(book_id: str, book_title: str, chapters: List[Dict[str, Any]]) -> int:
     """
@@ -207,7 +232,7 @@ async def call_llm(prompt: str, max_tokens: int = 500) -> str:
         "X-Title": "NovelStream AI"
     }
     payload = {
-        "model": "mistralai/mistral-7b-instruct:free",
+        "model": "meta-llama/llama-3.2-3b-instruct:free",
         "messages": [
             {"role": "system", "content": "You are NovelStream AI, a friendly, insightful, and precise literary assistant helping readers analyze and understand books."},
             {"role": "user", "content": prompt}
