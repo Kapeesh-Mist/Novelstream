@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NovelStream AI — Intelligent RAG-Powered PDF Reader</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#8b5cf6">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- PDF.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-violet-500/30">
+
+  <!-- TOP HEADER -->
+  <header class="glass-panel sticky top-0 z-40 px-4 py-3 flex items-center justify-between border-b border-gray-800">
+    <div class="flex items-center gap-3">
+      <button id="toggle-toc-btn" class="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors" title="Table of Contents">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+      </button>
+      <div class="flex items-center gap-2">
+        <span class="text-xl">📖</span>
+        <h1 class="font-bold text-base md:text-lg tracking-tight bg-gradient-to-r from-violet-400 to-indigo-300 bg-clip-text text-transparent">
+          NovelStream <span class="text-xs font-mono uppercase bg-violet-900/60 text-violet-300 px-1.5 py-0.5 rounded ml-1 border border-violet-700/50">AI</span>
+        </h1>
+      </div>
+      <span id="current-chapter-title-header" class="hidden md:inline-block text-xs text-gray-400 border-l border-gray-800 pl-3 max-w-[280px] truncate">
+        No Book Loaded
+      </span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button id="nav-library-btn" class="px-3 py-1.5 text-xs font-medium rounded-lg text-gray-300 hover:bg-gray-800 transition-colors flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+        <span class="hidden sm:inline">Library</span>
+      </button>
+
+      <button id="nav-upload-btn" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-violet-600 hover:bg-violet-500 text-white shadow-sm transition-colors flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+        <span class="hidden sm:inline">Upload PDF</span>
+      </button>
+
+      <input type="file" id="pdf-file-input" accept=".pdf" class="hidden">
+
+      <button id="toggle-settings-btn" class="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors" title="Settings">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+      </button>
+
+      <button id="toggle-ai-btn" class="p-2 hover:bg-gray-800 rounded-lg text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-1.5 ml-1" title="AI Assistant">
+        <span class="text-sm">✨</span>
+        <span class="text-xs font-semibold hidden md:inline">AI Assistant</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT CONTAINER -->
+  <div class="relative flex-1 flex overflow-hidden">
+
+    <!-- LEFT SIDEBAR: TABLE OF CONTENTS -->
+    <aside id="left-sidebar" class="fixed inset-y-0 left-0 z-30 w-72 pt-16 bg-gray-900 border-r border-gray-800 transform -translate-x-full transition-transform duration-200 ease-in-out md:relative md:pt-0 md:translate-x-0 flex flex-col">
+      <div class="p-4 border-b border-gray-800 flex items-center justify-between">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-gray-400">Table of Contents</h2>
+        <button id="close-toc-btn" class="md:hidden text-gray-500 hover:text-white text-sm">✕</button>
+      </div>
+      <div id="toc-list" class="flex-1 overflow-y-auto p-3 space-y-1">
+        <div class="text-xs text-gray-500 text-center py-6">Load a book to view chapters</div>
+      </div>
+    </aside>
+
+    <!-- CENTER CONTENT AREA -->
+    <main class="flex-1 overflow-y-auto relative flex flex-col items-center">
+
+      <!-- LIBRARY VIEW -->
+      <section id="library-view" class="w-full max-w-5xl px-6 py-10">
+        <div class="mb-8">
+          <h2 class="text-2xl font-bold tracking-tight text-gray-100">Your Bookshelf</h2>
+          <p class="text-sm text-gray-400 mt-1">Select a title to resume reading or upload a new PDF.</p>
+        </div>
+        <div id="books-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- READER VIEW -->
+      <section id="reader-view" class="hidden w-full max-w-3xl px-6 py-10 flex flex-col">
+        <div class="mb-8 border-b border-gray-800 pb-4">
+          <div id="reader-book-title" class="text-xs uppercase tracking-widest text-violet-400 font-semibold mb-1">Book Title</div>
+          <h2 id="chapter-heading" class="text-2xl font-bold text-gray-100 font-display">Chapter Heading</h2>
+        </div>
+
+        <!-- REFLOWED TEXT CONTENT -->
+        <article id="reflow-container" class="reflow-content min-h-[60vh] select-text">
+          <!-- Populated by reflow.js -->
+        </article>
+
+        <!-- CHAPTER NAVIGATION BAR -->
+        <div class="mt-12 pt-6 border-t border-gray-800 flex items-center justify-between">
+          <button id="prev-chapter-btn" class="px-4 py-2 text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl transition-colors flex items-center gap-2">
+            ← Previous Chapter
+          </button>
+          <span id="progress-indicator" class="text-xs text-gray-400 font-mono">Chapter 1 of 1</span>
+          <button id="next-chapter-btn" class="px-4 py-2 text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-xl transition-colors flex items-center gap-2">
+            Next Chapter →
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- RIGHT SIDEBAR: AI PANEL -->
+    <aside id="right-sidebar" class="fixed inset-y-0 right-0 z-30 w-84 sm:w-96 pt-16 bg-gray-900 border-l border-gray-800 transform translate-x-full transition-transform duration-200 ease-in-out md:relative md:pt-0 md:translate-x-0 flex flex-col">
+      <!-- TABS -->
+      <div class="p-3 border-b border-gray-800 flex items-center justify-between">
+        <div class="flex items-center gap-1">
+          <button data-tab="chat" class="ai-tab-btn active-tab px-3 py-1.5 text-xs font-semibold rounded-lg text-violet-400 border-b-2 border-violet-500">
+            💬 Q&A Chat
+          </button>
+          <button data-tab="notes" class="ai-tab-btn px-3 py-1.5 text-xs font-semibold rounded-lg text-gray-400 hover:text-gray-200">
+            📝 Notes
+          </button>
+          <button data-tab="glossary" class="ai-tab-btn px-3 py-1.5 text-xs font-semibold rounded-lg text-gray-400 hover:text-gray-200">
+            📖 Glossary
+          </button>
+        </div>
+        <button id="close-ai-btn" class="md:hidden text-gray-500 hover:text-white text-sm p-1">✕</button>
+      </div>
+
+      <!-- TAB 1: RAG CHAT -->
+      <div id="tab-chat" class="ai-tab-content flex-1 flex flex-col overflow-hidden p-3">
+        <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 pr-1 text-sm">
+          <div class="p-3 bg-gray-800/60 rounded-xl border border-gray-800 text-xs text-gray-300 leading-relaxed">
+            👋 <strong>Welcome to NovelStream AI.</strong> Ask questions about the current chapter or search themes across the entire book using our cross-chapter RAG vector index.
+          </div>
+        </div>
+        <div class="pt-3 border-t border-gray-800 flex items-center gap-2">
+          <input type="text" id="chat-query-input" placeholder="Ask anything about the book..." class="flex-1 bg-gray-800 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-violet-500 text-white placeholder-gray-500">
+          <button id="chat-send-btn" class="p-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 2: HIGHLIGHTS & NOTES SYNTHESIS -->
+      <div id="tab-notes" class="ai-tab-content hidden flex-1 flex flex-col overflow-hidden p-3">
+        <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+          <span class="text-xs font-semibold text-gray-300">Saved Highlights</span>
+          <button id="synthesize-btn" class="text-xs px-2.5 py-1 bg-violet-600 hover:bg-violet-500 text-white rounded-lg font-medium transition-colors">
+            ✨ Synthesize Notes
+          </button>
+        </div>
+        <div id="synthesis-result" class="hidden my-2"></div>
+        <div id="notes-list" class="flex-1 overflow-y-auto space-y-2 pt-2">
+          <!-- Populated by ai.js -->
+        </div>
+      </div>
+
+      <!-- TAB 3: CONTEXTUAL GLOSSARY -->
+      <div id="tab-glossary" class="ai-tab-content hidden flex-1 flex flex-col overflow-hidden p-3">
+        <div class="pb-2 text-xs text-gray-400 border-b border-gray-800">
+          Domain Terms & Definitions
+        </div>
+        <div id="glossary-list" class="flex-1 overflow-y-auto space-y-2 pt-2">
+          <!-- Populated by ai.js -->
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- FLOATING TEXT SELECTION TOOLBAR -->
+  <div id="text-selection-toolbar" class="hidden glass-panel rounded-xl shadow-2xl p-1.5 flex items-center gap-1 border border-violet-500/40">
+    <button id="popover-highlight-btn" class="px-2.5 py-1 text-xs rounded hover:bg-violet-600/30 text-amber-300 flex items-center gap-1 font-medium transition-colors">
+      🖍️ Highlight
+    </button>
+    <button id="popover-define-btn" class="px-2.5 py-1 text-xs rounded hover:bg-violet-600/30 text-indigo-300 flex items-center gap-1 font-medium transition-colors">
+      📖 Define
+    </button>
+    <button id="popover-explain-btn" class="px-2.5 py-1 text-xs rounded hover:bg-violet-600/30 text-violet-300 flex items-center gap-1 font-medium transition-colors">
+      ✨ Explain
+    </button>
+  </div>
+
+  <!-- SETTINGS DRAWER -->
+  <div id="settings-drawer" class="fixed inset-y-0 right-0 z-50 w-80 bg-gray-900 border-l border-gray-800 p-6 transform translate-x-full transition-transform duration-200 ease-in-out shadow-2xl flex flex-col">
+    <div class="flex items-center justify-between pb-4 border-b border-gray-800">
+      <h3 class="font-bold text-gray-100 text-sm">Reading Settings</h3>
+      <button id="close-settings-btn" class="text-gray-400 hover:text-white text-sm">✕</button>
+    </div>
+    <div class="space-y-6 pt-6 flex-1">
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Color Theme</label>
+        <select id="setting-theme" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-200">
+          <option value="dark">Dark Slate</option>
+          <option value="light">Crisp Light</option>
+          <option value="sepia">Warm Sepia</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Typeface</label>
+        <select id="setting-font" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-200">
+          <option value="serif">Lora (Editorial Serif)</option>
+          <option value="sans">Inter (Modern Sans)</option>
+          <option value="mono">JetBrains Mono (Technical)</option>
+        </select>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Font Size</label>
+          <span id="font-size-val" class="text-xs font-mono text-violet-400">18px</span>
+        </div>
+        <input id="setting-font-size" type="range" min="14" max="28" value="18" class="w-full accent-violet-500">
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING OVERLAY -->
+  <div id="loading-screen" class="hidden fixed inset-0 z-50 bg-gray-950/80 backdrop-blur-md flex flex-col items-center justify-center">
+    <div class="w-12 h-12 border-4 border-violet-500/20 border-t-violet-500 rounded-full animate-spin mb-4"></div>
+    <p id="loading-text" class="text-sm font-medium text-gray-200">Processing document...</p>
+  </div>
+
+  <!-- REGISTER SERVICE WORKER & APP SCRIPT -->
+  <script type="module" src="/static/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/sw.js')
+          .then(reg => console.log('SW Registered:', reg.scope))
+          .catch(err => console.log('SW Registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,2 @@
+"""NovelStream AI application package."""
+
